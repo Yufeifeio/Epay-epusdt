@@ -8,6 +8,11 @@
 
 本仓库提供 Epusdt 对接易支付的插件发布包，适配保持 Epay 兼容接口的 Epusdt 版本，放入易支付即可直接对接。
 
+## 截图
+
+![插件截图 1](assets/screenshots/1.png)
+![插件截图 2](assets/screenshots/2.png)
+
 ## 安装
 
 1. 将 `plugins/epusdt/epusdt_plugin.php` 放入易支付对应插件目录。
