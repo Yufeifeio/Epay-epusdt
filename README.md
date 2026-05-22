@@ -2,6 +2,8 @@
 
 ![](assets/icon/telegram.svg) 鱼肥肥 [@pyufc](https://t.me/pyufc)
 
+此款插件是基于 https://github.com/Yufeifeio/Epay 开发，其它版本易支付不保证100%可用！
+
 ![USDT Icon](assets/icon/usdt.ico)
 
 ## 说明
