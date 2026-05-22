@@ -1,6 +1,6 @@
 # Epay-epusdt
 
-✈ 鱼肥肥 [@pyufc](https://t.me/pyufc)
+![](assets/icon/telegram.svg) 鱼肥肥 [@pyufc](https://t.me/pyufc)
 
 ![USDT Icon](assets/icon/usdt.ico)
 

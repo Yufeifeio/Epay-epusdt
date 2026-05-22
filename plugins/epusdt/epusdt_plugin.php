@@ -143,6 +143,7 @@ class epusdt_plugin
 	static private function resolveGatewayConfig($url){
 		$url = self::normalizeUrl($url);
 		$path = parse_url($url, PHP_URL_PATH);
+		$path = rtrim((string)$path, '/');
 		if($path && preg_match('#/payments/epay/v1/order/create-transaction/submit\.php$#i', $path)){
 			$submitUrl = $url;
 		}elseif($path && preg_match('#/payments/epay/v1/order/create-transaction$#i', $path)){
@@ -170,7 +171,7 @@ class epusdt_plugin
 		if(isset($parts['port'])){
 			$origin .= ':'.$parts['port'];
 		}
-		$path = isset($parts['path']) ? $parts['path'] : '/';
+		$path = isset($parts['path']) ? rtrim($parts['path'], '/') : '/';
 		if(empty($path) || $path === '/'){
 			return $origin.'/';
 		}
@@ -195,7 +196,7 @@ class epusdt_plugin
 		if(stripos($url, 'http://') !== 0 && stripos($url, 'https://') !== 0){
 			throw new Exception('Epusdt接口地址格式错误，必须以 http:// 或 https:// 开头');
 		}
-		return rtrim($url, '/').'/';
+		return rtrim($url, '/');
 	}
 
 	static private function joinUrl($base, $path){
