@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&height=220&color=0:0A2540,50:2563EB,100:60A5FA&text=Epay-epusdt&fontColor=ffffff&fontSize=42&fontAlign=50&fontAlignY=40&desc=Epusdt%20Plugin%20for%20Epay&descAlign=50&descAlignY=62" alt="banner" />
+  <img src="https://capsule-render.vercel.app/api?type=waving&height=220&color=0:0A2540,50:2563EB,100:60A5FA&text=Epay-epusdt&fontColor=ffffff&fontSize=42&fontAlign=50&fontAlignY=40&desc=Epay%20%E7%9A%84%20Epusdt%20%E6%8F%92%E4%BB%B6&descAlign=50&descAlignY=62" alt="banner" />
 </div>
 
 <div align="center">
