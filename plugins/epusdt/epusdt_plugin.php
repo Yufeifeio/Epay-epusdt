@@ -12,7 +12,7 @@ class epusdt_plugin
 			'appurl' => [
 				'name' => 'API地址',
 				'type' => 'input',
-				'note' => '支持填写站点根地址，或易支付兼容接口完整地址。例如：https://demo.com/ 或 https://demo.com/payments/epay/v1/order/create-transaction/submit.php',
+				'note' => '填写站点根地址或完整接口地址',
 			],
 			'appid' => [
 				'name' => 'PID',
@@ -27,7 +27,7 @@ class epusdt_plugin
 			'appswitch' => [
 				'name' => '收银台域名',
 				'type' => 'input',
-				'note' => '可留空。用于将本机接口返回的 /pay/checkout-counter/... 拼接成外网可访问地址，例如 https://422.gmwallet.top/',
+				'note' => '外网收银台域名，可留空',
 			],
 		],
 		'select' => null,
