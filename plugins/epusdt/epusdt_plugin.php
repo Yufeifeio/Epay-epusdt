@@ -29,9 +29,14 @@ class epusdt_plugin
 				'type' => 'input',
 				'note' => '外网收银台域名，可留空',
 			],
+			'appselector' => [
+				'name' => '支付资产',
+				'type' => 'input',
+				'note' => 'Epusdt v1.0.9+ 填 token.network，默认 usdt.tron',
+			],
 		],
 		'select' => null,
-		'note' => '支付方式请新增为 usdt。插件使用 Epusdt 的易支付兼容接口下单，并兼容 GET/POST 异步回调。',
+		'note' => '支付方式请新增为 usdt。插件使用 Epusdt 的易支付兼容接口下单，默认提交 type=usdt.tron，并兼容 GET/POST 异步回调。',
 		'bindwxmp' => false,
 		'bindwxa' => false,
 	];
@@ -88,7 +93,7 @@ class epusdt_plugin
 		$returnUrl = $siteurl.'pay/return/'.TRADE_NO.'/';
 		$params = [
 			'pid' => trim($channel['appid']),
-			'type' => $order['typename'],
+			'type' => self::resolvePaySelector($channel),
 			'notify_url' => $conf['localurl'].'pay/notify/'.TRADE_NO.'/',
 			'return_url' => $returnUrl,
 			'out_trade_no' => TRADE_NO,
@@ -278,6 +283,20 @@ class epusdt_plugin
 			$pairs[] = $k.'='.$v;
 		}
 		return md5(implode('&', $pairs).$key);
+	}
+
+	static private function resolvePaySelector($channel){
+		$selector = isset($channel['appselector']) ? strtolower(trim($channel['appselector'])) : '';
+		if($selector === ''){
+			$selector = 'usdt.tron';
+		}
+		if($selector === 'alipay'){
+			return $selector;
+		}
+		if(!preg_match('/^[a-z0-9]+\\.[a-z0-9_-]+$/', $selector)){
+			throw new Exception('Epusdt支付资产配置错误，请填写 usdt.tron 这类 token.network');
+		}
+		return $selector;
 	}
 
 	static private function verifySign($params, $key){
