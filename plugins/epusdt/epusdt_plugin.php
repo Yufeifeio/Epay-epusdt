@@ -103,7 +103,10 @@ class epusdt_plugin
 		$params['sign'] = self::makeSign($params, $channel['appkey']);
 		$params['sign_type'] = 'MD5';
 
-		$response = self::requestWithHeaders($apiUrl.'?'.http_build_query($params));
+		$response = self::requestWithHeaders($apiUrl, 'POST', $params);
+		if(self::isParseRequestParamsError($response)){
+			$response = self::requestWithHeaders($apiUrl.'?'.http_build_query($params));
+		}
 		$headers = $response['headers'];
 		$statusCode = $response['status'];
 		$location = '';
@@ -119,6 +122,9 @@ class epusdt_plugin
 			$json = json_decode($body, true);
 			if(isset($json['message']) && $json['message']){
 				throw new Exception('Epusdt下单失败：'.$json['message']);
+			}
+			if(self::isParseRequestParamsError($response)){
+				throw new Exception('Epusdt下单失败：failed to parse request params');
 			}
 			throw new Exception('Epusdt下单失败，未返回支付跳转地址');
 		}
@@ -241,16 +247,23 @@ class epusdt_plugin
 			&& filter_var($host, FILTER_VALIDATE_IP) !== false;
 	}
 
-	static private function requestWithHeaders($url){
+	static private function requestWithHeaders($url, $method = 'GET', $postFields = null){
 		$ch = curl_init();
 		curl_setopt($ch, CURLOPT_URL, $url);
 		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-		curl_setopt($ch, CURLOPT_HTTPHEADER, [
+		$headers = [
 			'Accept: */*',
 			'Accept-Language: zh-CN,zh;q=0.8',
 			'Connection: close',
-		]);
+		];
+		if(strtoupper($method) === 'POST'){
+			curl_setopt($ch, CURLOPT_POST, true);
+			curl_setopt($ch, CURLOPT_POSTFIELDS, is_array($postFields) ? http_build_query($postFields) : (string)$postFields);
+			$headers[] = 'Content-Type: application/x-www-form-urlencoded; charset=UTF-8';
+			$headers[] = 'Expect:';
+		}
+		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 		curl_setopt($ch, CURLOPT_HEADER, true);
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 		curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
@@ -273,6 +286,20 @@ class epusdt_plugin
 			'headers' => preg_split("/\\r\\n|\\n|\\r/", trim($headerText)),
 			'body' => $body,
 		];
+	}
+
+	static private function isParseRequestParamsError($response){
+		$body = trim(isset($response['body']) ? $response['body'] : '');
+		if($body === '') return false;
+		if(stripos($body, 'failed to parse request params') !== false) return true;
+		$json = json_decode($body, true);
+		if(!is_array($json)) return false;
+		foreach(['message', 'msg', 'error'] as $key){
+			if(!empty($json[$key]) && stripos((string)$json[$key], 'failed to parse request params') !== false){
+				return true;
+			}
+		}
+		return false;
 	}
 
 	static private function makeSign($params, $key){
