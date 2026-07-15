@@ -93,7 +93,7 @@ class epusdt_plugin
 		$returnUrl = $siteurl.'pay/return/'.TRADE_NO.'/';
 		$params = [
 			'pid' => trim($channel['appid']),
-			'type' => self::resolvePaySelector($channel),
+			'type' => self::resolvePaySelector($channel, $order['typename']),
 			'notify_url' => $conf['localurl'].'pay/notify/'.TRADE_NO.'/',
 			'return_url' => $returnUrl,
 			'out_trade_no' => TRADE_NO,
@@ -312,10 +312,10 @@ class epusdt_plugin
 		return md5(implode('&', $pairs).$key);
 	}
 
-	static private function resolvePaySelector($channel){
+	static private function resolvePaySelector($channel, $typename='usdt'){
 		$selector = isset($channel['appselector']) ? strtolower(trim($channel['appselector'])) : '';
 		if($selector === ''){
-			$selector = 'usdt.tron';
+			return self::buildTypeSelector($typename);
 		}
 		if($selector === 'alipay'){
 			return $selector;
@@ -324,6 +324,13 @@ class epusdt_plugin
 			throw new Exception('Epusdt支付资产配置错误，请填写 usdt.tron 这类 token.network');
 		}
 		return $selector;
+	}
+
+	static private function buildTypeSelector($typename){
+		$typename = strtolower(trim((string)$typename));
+		if($typename === '') return 'usdt.tron';
+		if(strpos($typename, '.') !== false) return $typename;
+		return $typename.'.tron';
 	}
 
 	static private function verifySign($params, $key){
