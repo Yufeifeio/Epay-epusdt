@@ -32,7 +32,7 @@ class epusdt_plugin
 			'appselector' => [
 				'name' => '支付资产',
 				'type' => 'input',
-				'note' => 'Epusdt v1.0.9+ 填 token.network，默认 usdt.tron',
+				'note' => 'Epusdt v1.0.9+（含 v2.0）填 token.network，默认 usdt.tron',
 			],
 		],
 		'select' => null,

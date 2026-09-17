@@ -37,7 +37,7 @@ Epusdt 对接易支付插件，适配 Epay 兼容接口。
 
 ## 说明
 
-- 兼容 Epusdt v1.0.10+
+- 兼容 Epusdt v1.0.10 和 v2.0.0
 - 默认提交 `type=usdt.tron`
 - 回调支持 `GET` / `POST`
 - `notify_url` 需公网可访问
