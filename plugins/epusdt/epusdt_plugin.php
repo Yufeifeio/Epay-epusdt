@@ -32,7 +32,12 @@ class epusdt_plugin
 			'appselector' => [
 				'name' => '支付资产',
 				'type' => 'input',
-				'note' => 'Epusdt v1.0.9+（含 v2.0）填 token.network，默认 usdt.tron',
+				'note' => '填写 usdt.tron 等 token.network；alipay 使用网关默认资产或多链收银台；默认 usdt.tron',
+			],
+			'appcurrency' => [
+				'name' => '订单法币',
+				'type' => 'input',
+				'note' => '须与易支付订单计价币种一致，默认 cny；例如 cny、usd',
 			],
 		],
 		'select' => null,
@@ -62,20 +67,30 @@ class epusdt_plugin
 		global $channel, $order;
 
 		$data = !empty($_POST) ? $_POST : $_GET;
-		if(empty($data)) {
+		if(empty($data) || !self::verifySign($data, $channel['appkey'])) {
 			return ['type'=>'html', 'data'=>'fail'];
 		}
 
-		if(!self::verifySign($data, $channel['appkey'])){
-			return ['type'=>'html', 'data'=>'fail'];
+		foreach(['pid', 'out_trade_no', 'trade_no', 'money', 'trade_status'] as $field){
+			if(!isset($data[$field]) || !is_string($data[$field]) || trim($data[$field]) === ''){
+				return ['type'=>'html', 'data'=>'fail'];
+			}
 		}
 
-		$outTradeNo = isset($data['out_trade_no']) ? trim($data['out_trade_no']) : '';
-		$tradeNo = isset($data['trade_no']) ? trim($data['trade_no']) : '';
-		$money = isset($data['money']) ? trim($data['money']) : '';
-		$tradeStatus = isset($data['trade_status']) ? trim($data['trade_status']) : '';
+		$pid = trim($data['pid']);
+		$expectedPid = trim((string)$channel['appid']);
+		if(!preg_match('/^[0-9]+$/D', $pid) || !preg_match('/^[0-9]+$/D', $expectedPid)
+			|| ltrim($pid, '0') !== ltrim($expectedPid, '0')){
+			return ['type'=>'html', 'data'=>'fail'];
+		}
+		$outTradeNo = trim($data['out_trade_no']);
+		$tradeNo = trim($data['trade_no']);
+		$money = self::normalizeMoney($data['money']);
+		$expectedMoney = self::normalizeMoney($order['realmoney']);
+		$tradeStatus = trim($data['trade_status']);
 
-		if($tradeStatus === 'TRADE_SUCCESS' && $outTradeNo === TRADE_NO && round((float)$money, 2) === round((float)$order['realmoney'], 2)){
+		if($tradeStatus === 'TRADE_SUCCESS' && $outTradeNo === TRADE_NO
+			&& $money !== null && $expectedMoney !== null && $money === $expectedMoney){
 			processNotify($order, $tradeNo);
 			return ['type'=>'html', 'data'=>'success'];
 		}
@@ -88,12 +103,20 @@ class epusdt_plugin
 	}
 
 	static private function createOrder($channel, $order, $siteurl, $conf){
+		$pid = trim((string)$channel['appid']);
+		if(!preg_match('/^[0-9]+$/D', $pid) || ltrim($pid, '0') === ''){
+			throw new Exception('Epusdt PID 必须为正整数');
+		}
+		if(!is_string($channel['appkey']) || $channel['appkey'] === ''){
+			throw new Exception('Epusdt密钥未配置');
+		}
 		$gateway = self::resolveGatewayConfig($channel['appurl']);
 		$apiUrl = $gateway['submit_url'];
 		$returnUrl = $siteurl.'pay/return/'.TRADE_NO.'/';
 		$params = [
-			'pid' => trim($channel['appid']),
+			'pid' => $pid,
 			'type' => self::resolvePaySelector($channel, $order['typename']),
+			'currency' => self::resolveCurrency($channel),
 			'notify_url' => $conf['localurl'].'pay/notify/'.TRADE_NO.'/',
 			'return_url' => $returnUrl,
 			'out_trade_no' => TRADE_NO,
@@ -120,35 +143,50 @@ class epusdt_plugin
 		if($statusCode < 300 || $statusCode >= 400 || empty($location)){
 			$body = trim($response['body']);
 			$json = json_decode($body, true);
-			if(isset($json['message']) && $json['message']){
-				throw new Exception('Epusdt下单失败：'.$json['message']);
+			if(is_array($json)){
+				foreach(['message', 'msg', 'error'] as $field){
+					if(!empty($json[$field]) && is_string($json[$field])){
+						throw new Exception('Epusdt下单失败：'.$json[$field]);
+					}
+				}
 			}
 			if(self::isParseRequestParamsError($response)){
 				throw new Exception('Epusdt下单失败：failed to parse request params');
 			}
-			throw new Exception('Epusdt下单失败，未返回支付跳转地址');
+			throw new Exception('Epusdt下单失败，未返回支付跳转地址（HTTP '.$statusCode.'）');
 		}
 
 		return self::buildPublicCheckoutUrl($location, $channel['appswitch'], $gateway['checkout_base']);
 	}
 
 	static private function buildPublicCheckoutUrl($location, $publicBaseUrl, $checkoutBase){
-		if(stripos($location, 'http://') === 0 || stripos($location, 'https://') === 0){
-			return $location;
-		}
+		$location = trim($location);
 		$base = trim($publicBaseUrl);
-		if(empty($base)) {
+		$absolute = stripos($location, 'http://') === 0 || stripos($location, 'https://') === 0
+			|| strpos($location, '//') === 0;
+		if($base === '' && $absolute){
+			$url = self::joinUrl($checkoutBase, $location);
+		}elseif($base === '') {
 			$base = $checkoutBase;
+			$url = self::joinUrl($base, $location);
 		} else {
 			$base = self::deriveCheckoutBase($base);
+			if($absolute){
+				$parts = parse_url($location);
+				if($parts === false){
+					throw new Exception('Epusdt返回的收银台地址格式错误');
+				}
+				$location = isset($parts['path']) ? $parts['path'] : '/';
+				if(isset($parts['query'])) $location .= '?'.$parts['query'];
+				if(isset($parts['fragment'])) $location .= '#'.$parts['fragment'];
+			}
+			$url = self::joinUrl($base, $location);
 		}
-		if(empty($base)){
+		self::validateHttpUrl($url);
+		if(self::isLocalBaseUrl($url)){
 			throw new Exception('Epusdt收银台域名未配置，请填写可外网访问的收银台域名');
 		}
-		if(self::isLocalBaseUrl($base)){
-			throw new Exception('Epusdt收银台域名未配置，请填写可外网访问的收银台域名');
-		}
-		return self::joinUrl($base, $location);
+		return $url;
 	}
 
 	static private function resolveGatewayConfig($url){
@@ -204,14 +242,29 @@ class epusdt_plugin
 	static private function normalizeUrl($url){
 		$url = trim($url);
 		if(empty($url)) throw new Exception('Epusdt接口地址未配置');
-		if(stripos($url, 'http://') !== 0 && stripos($url, 'https://') !== 0){
-			throw new Exception('Epusdt接口地址格式错误，必须以 http:// 或 https:// 开头');
+		$parts = self::validateHttpUrl($url);
+		if(isset($parts['query']) || isset($parts['fragment'])){
+			throw new Exception('Epusdt接口地址不能包含查询参数或锚点');
 		}
 		return rtrim($url, '/');
 	}
 
+	static private function validateHttpUrl($url){
+		$parts = parse_url($url);
+		if($parts === false || empty($parts['scheme']) || empty($parts['host'])
+			|| !in_array(strtolower($parts['scheme']), ['http', 'https'], true)
+			|| isset($parts['user']) || isset($parts['pass']) || preg_match('/[\x00-\x20\x7f\\\\]/', $url)){
+			throw new Exception('Epusdt地址格式错误，必须为有效的 http:// 或 https:// 地址');
+		}
+		return $parts;
+	}
+
 	static private function joinUrl($base, $path){
 		$path = trim($path);
+		if(preg_match('#^[a-z][a-z0-9+.-]*:#i', $path)){
+			self::validateHttpUrl($path);
+			return $path;
+		}
 		if(empty($path)){
 			return rtrim($base, '/').'/';
 		}
@@ -240,9 +293,9 @@ class epusdt_plugin
 	}
 
 	static private function isLocalBaseUrl($url){
-		$host = parse_url($url, PHP_URL_HOST);
+		$host = strtolower(trim((string)parse_url($url, PHP_URL_HOST), '[]'));
 		if(empty($host)) return false;
-		if(in_array($host, ['127.0.0.1', 'localhost', '::1'], true)) return true;
+		if($host === 'localhost' || self::endsWith($host, '.localhost')) return true;
 		return filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false
 			&& filter_var($host, FILTER_VALIDATE_IP) !== false;
 	}
@@ -250,8 +303,10 @@ class epusdt_plugin
 	static private function requestWithHeaders($url, $method = 'GET', $postFields = null){
 		$ch = curl_init();
 		curl_setopt($ch, CURLOPT_URL, $url);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+		curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
+		curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
 		$headers = [
 			'Accept: */*',
 			'Accept-Language: zh-CN,zh;q=0.8',
@@ -303,13 +358,29 @@ class epusdt_plugin
 	}
 
 	static private function makeSign($params, $key){
-		ksort($params);
+		ksort($params, SORT_STRING);
 		$pairs = [];
 		foreach($params as $k => $v){
 			if($k === 'sign' || $k === 'sign_type' || $v === '' || $v === null) continue;
 			$pairs[] = $k.'='.$v;
 		}
 		return md5(implode('&', $pairs).$key);
+	}
+
+	static private function normalizeMoney($money){
+		$money = trim((string)$money);
+		if(!preg_match('/^([0-9]+)(?:\.([0-9]{1,2})0*)?$/D', $money, $matches)) return null;
+		$whole = ltrim($matches[1], '0');
+		return ($whole === '' ? '0' : $whole).'.'.str_pad(isset($matches[2]) ? $matches[2] : '', 2, '0');
+	}
+
+	static private function resolveCurrency($channel){
+		$currency = isset($channel['appcurrency']) ? strtolower(trim($channel['appcurrency'])) : '';
+		if($currency === '') return 'cny';
+		if(!preg_match('/^[a-z]{3}$/D', $currency)){
+			throw new Exception('Epusdt订单法币配置错误，请填写 cny、usd 这类三字母币种');
+		}
+		return $currency;
 	}
 
 	static private function resolvePaySelector($channel, $typename='usdt'){
@@ -334,7 +405,12 @@ class epusdt_plugin
 	}
 
 	static private function verifySign($params, $key){
-		if(empty($params['sign'])) return false;
+		if(!is_string($key) || $key === '' || empty($params['sign']) || !is_string($params['sign'])
+			|| !preg_match('/^[a-f0-9]{32}$/D', $params['sign'])) return false;
+		foreach($params as $value){
+			if(!is_scalar($value) && $value !== null) return false;
+		}
+		if(isset($params['sign_type']) && $params['sign_type'] !== 'MD5') return false;
 		return hash_equals(self::makeSign($params, $key), (string)$params['sign']);
 	}
 }
