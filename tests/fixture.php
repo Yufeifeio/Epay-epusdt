@@ -49,6 +49,7 @@ if(!$valid){
 
 $location = '/pay/checkout-counter/fixture-trade';
 if($scenario === 'absolute') $location = 'http://127.0.0.1:8000'.$location.'?from=api';
+if($scenario === 'public') $location = 'https://checkout.example'.$location;
 if($scenario === 'private') $location = 'http://10.0.0.1'.$location;
 if($scenario === 'protocol') $location = '//checkout.example'.$location;
 if($scenario === 'relative') $location = 'pay/checkout-counter/fixture-trade';

@@ -156,7 +156,7 @@ class epusdt_plugin
 			throw new Exception('Epusdt下单失败，未返回支付跳转地址（HTTP '.$statusCode.'）');
 		}
 
-		return self::buildPublicCheckoutUrl($location, $channel['appswitch'], $gateway['checkout_base']);
+		return self::buildPublicCheckoutUrl($location, $channel['appswitch'] ?? '', $gateway['checkout_base']);
 	}
 
 	static private function buildPublicCheckoutUrl($location, $publicBaseUrl, $checkoutBase){
@@ -301,6 +301,9 @@ class epusdt_plugin
 	}
 
 	static private function requestWithHeaders($url, $method = 'GET', $postFields = null){
+		if(!function_exists('curl_init')){
+			throw new Exception('PHP cURL 扩展未启用，请启用后重试');
+		}
 		$ch = curl_init();
 		curl_setopt($ch, CURLOPT_URL, $url);
 		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);

@@ -173,6 +173,22 @@ namespace {
 			same('error', $result['type']);
 			if(strpos($result['msg'], 'order id conflict') === false) throw new \RuntimeException('gateway error was lost');
 		});
+		check('legacy configuration can omit optional cashier and asset fields', function() use($base){
+			resetState($base.'/public'); unset($GLOBALS['channel']['appswitch']);
+			same(['type'=>'jump', 'url'=>'https://checkout.example/pay/checkout-counter/fixture-trade'], \epusdt_plugin::submit());
+		});
+		check('public API origin supports an empty cashier setting', function(){
+			$method = new \ReflectionMethod('epusdt_plugin', 'buildPublicCheckoutUrl');
+			$method->setAccessible(true);
+			same('https://gateway.example/pay/checkout-counter/fixture-trade', $method->invoke(null, '/pay/checkout-counter/fixture-trade', '', 'https://gateway.example/'));
+		});
+		check('missing cURL extension returns a configuration error', function(){
+			$script = 'require $argv[1]; $m=new ReflectionMethod("epusdt_plugin","requestWithHeaders"); $m->setAccessible(true); try{$m->invoke(null,"https://gateway.example"); exit(1);}catch(Exception $e){echo $e->getMessage();}';
+			$process = proc_open([PHP_BINARY, '-n', '-d', 'disable_functions=curl_init', '-r', $script, dirname(__DIR__).'/plugins/epusdt/epusdt_plugin.php'], [0=>['pipe','r'],1=>['pipe','w'],2=>['pipe','w']], $pipes);
+			fclose($pipes[0]); $output = stream_get_contents($pipes[1]); $error = stream_get_contents($pipes[2]);
+			fclose($pipes[1]); fclose($pipes[2]); same(0, proc_close($process)); same('', $error);
+			if(strpos($output, 'cURL') === false) throw new \RuntimeException('missing extension error was not reported');
+		});
 		check('absolute private checkout address is rejected', function() use($base){
 			resetState($base.'/private'); $GLOBALS['channel']['appswitch'] = '';
 			same('error', \epusdt_plugin::submit()['type']);

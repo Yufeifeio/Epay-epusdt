@@ -39,7 +39,20 @@ Epusdt 对接易支付插件，使用官方 EPay 兼容接口，当前对照 [Ep
 | `appselector` | 网关已启用且可收款的 `token.network`，或 `alipay` | 留空为 `usdt.tron` |
 | `appcurrency` | 易支付订单的计价法币，随下单请求参与签名 | 留空为 `cny`，可填 `usd` 等 |
 
-PHP 需要 `curl` 扩展和有效的 CA 证书库。生产环境建议使用 HTTPS；插件会校验服务端证书。若 API 使用 `127.0.0.1` 等内网地址，必须填写买家可以访问的公网收银台地址。
+PHP 需要 `curl` 扩展和有效的 CA 证书库。生产环境建议使用 HTTPS；插件会校验服务端证书。若 API 使用 `127.0.0.1` 等内网地址，必须填写买家可以访问的公网收银台地址。`appurl` 推荐填写网关根地址；填写完整接口时应使用 `/payments/epay/v1/order/create-transaction/submit.php`。根目录的 `/submit.php`、`/mapi.php` 只有在服务器另行配置兼容转发时才可用。
+
+## 适用范围
+
+| 项目 | 已验证范围 / 要求 |
+| --- | --- |
+| 易支付 | 基于本页所链接的 `Yufeifeio/Epay` 插件接口，必须提供 `lib\Payment::lockPayData`、`processNotify` 及相同的订单字段 |
+| 网关 | 官方 Epusdt v2.1.3 EPay 兼容接口 |
+| PHP | PHP 7.4、8.0、8.2 的回归测试通过；其他版本需在对应环境验证 |
+| 默认配置 | `usdt.tron` + `cny`，网关须启用 TRON-USDT 并配置有效收款地址 |
+| 其他资产 | 使用网关支持且已启用的 selector，并配置该网络的有效收款地址及汇率 |
+| 回调与域名 | 易支付回调域名必须公网可访问，HTTPS 证书有效，不能被登录验证或 WAF 拦截 |
+
+其他易支付分支需先核对插件接口，不能仅凭名称相同判断兼容。订单法币必须与实际计价一致；美元计价的用户应填写 `usd`。
 
 ## 说明
 
@@ -64,6 +77,8 @@ php tests/run.php
 ```
 
 测试要求 PHP 7.4+、`curl` / `openssl` 扩展、`openssl` 命令和可用的 `proc_open`。测试使用本机临时 HTTP / TLS 服务，不连接真实网关，不调用真实商户的到账处理。覆盖官方签名样例、下单参数、支付资产与法币、地址解析、有限的 GET 兼容重试、回调校验和不受信任的 HTTPS 证书。
+
+另有 [官方网关联调测试](tests/integration/README.md)，在官方 v2.1.3 的临时数据库中，直接调用本插件并接收官方代码生成的签名通知，覆盖默认资产、完整接口地址、USD、`alipay` 两种模式及 Solana。
 
 ## 相关截图
 
